@@ -263,93 +263,117 @@ elements.accountForgotPasswordButton.addEventListener('click', () => {
 let accountBeingVerified;
 
 elements.accountLoginForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-
-    // Prepare hCaptcha
-    var hcaptchaToken = undefined;
-    var hcaptchaID = undefined;
-    if (getAuth()!.info!.hcaptcha?.required) {
-        hcaptchaID = elements.accountLoginCaptchaContainer.getAttribute("data-hcaptcha-widget-id")!;
-        var response = hcaptcha.getResponse(hcaptchaID);
-        if (response === "") {
-            // Show error if hCaptcha not completed
-            elements.accountModalErrorText.innerHTML = TheI18n.GetString(I18nStringKey.kMissingCaptcha);
-            elements.accountModalError.style.display = "block";
-            return false;
-        }
-        hcaptchaToken = response;
-    }
-
-    // Prepare Turnstile captcha
-    var turnstileToken = undefined;
-    var turnstileID = undefined;
-    if (getAuth()!.info!.turnstile?.required) {
-        turnstileID = elements.accountLoginTurnstileContainer.getAttribute("data-turnstile-widget-id")!;
-        var response: string = turnstile.getResponse(turnstileID) || "";
-        if (response === "") {
-            // Show error if Turnstile not completed
-            elements.accountModalErrorText.innerHTML = TheI18n.GetString(I18nStringKey.kMissingCaptcha);
-            elements.accountModalError.style.display = "block";
-            return false;
-        }
-        turnstileToken = response;
-    }
-
-    // Prepare reCAPTCHA
-    var recaptchaToken = undefined;
-    var recaptchaID = undefined;
-    if (getAuth()!.info!.recaptcha?.required) {
-        recaptchaID = parseInt(elements.accountLoginRecaptchaContainer.getAttribute("data-recaptcha-widget-id")!);
-        var response = grecaptcha.getResponse(recaptchaID);
-        if (response === "") {
-            // Show error if reCAPTCHA not completed
-            elements.accountModalErrorText.innerHTML = TheI18n.GetString(I18nStringKey.kMissingCaptcha);
-            elements.accountModalError.style.display = "block";
-            return false;
-        }
-        recaptchaToken = response;
-    }
-
-    // Gather credentials
-    var username = elements.accountLoginUsername.value;
-    var password = elements.accountLoginPassword.value;
-
-    // Attempt login
-    var result = await getAuth()!.login(username, password, hcaptchaToken, turnstileToken, recaptchaToken);
-
-    // Reset captchas if used
-    if (getAuth()!.info!.hcaptcha?.required) hcaptcha.reset(hcaptchaID);
-    if (getAuth()!.info!.turnstile?.required) turnstile.reset(turnstileID);
-    if (getAuth()!.info!.recaptcha?.required) grecaptcha.reset(recaptchaID);
-
-    if (result.success) {
-        // Clear input fields on success
-        elements.accountLoginUsername.value = "";
-        elements.accountLoginPassword.value = "";
-        if (result.verificationRequired) {
-            // Show email verification step
-            accountBeingVerified = result.username;
-            elements.accountVerifyEmailText.innerText = TheI18n.GetString(I18nStringKey.kAccountModal_VerifyText, result.email!);
-            elements.accountLoginSection.style.display = "none";
-            elements.accountVerifyEmailSection.style.display = "block";
-            return false;
-        }
-        // Save session token and finalize login
-        localStorage.setItem("collabvm_session_" + new URL(getAuth()!.apiEndpoint).host, result.token!);
-        loadAccount();
-        accountModal.hide();
-    } else {
-        // Display login error
-        elements.accountModalErrorText.innerHTML = result.error!;
-        elements.accountModalError.style.display = "block";
-    }
-
-    return false;
-});
+	e.preventDefault();
+  
+	if (!getAuth()) {
+	  elements.accountModalErrorText.innerHTML =
+		TheI18n.GetString(I18nStringKey.kGeneric_No) ||
+		"Unexpected error.";
+	  elements.accountModalError.style.display = 'block';
+	  return false;
+	}
+  
+	// Capture widget IDs for reset
+	let hcaptchaID: string | undefined;
+	let turnstileID: string | undefined;
+	let recaptchaID: number | undefined;
+  
+	// hCaptcha
+	let hcaptchaToken: string | undefined;
+	if (getAuth()!.info!.hcaptcha?.required) {
+	  hcaptchaID = elements.accountLoginCaptchaContainer.getAttribute('data-hcaptcha-widget-id')!;
+	  const resp = (window as any).hcaptcha.getResponse(hcaptchaID) || '';
+	  if (!resp) {
+		elements.accountModalErrorText.innerHTML =
+		  TheI18n.GetString(I18nStringKey.kMissingCaptcha);
+		elements.accountModalError.style.display = 'block';
+		return false;
+	  }
+	  hcaptchaToken = resp;
+	}
+  
+	// Turnstile
+	let turnstileToken: string | undefined;
+	if (getAuth()!.info!.turnstile?.required) {
+	  turnstileID = elements.accountLoginTurnstileContainer.getAttribute('data-turnstile-widget-id')!;
+	  const resp = (window as any).turnstile.getResponse(turnstileID) || '';
+	  if (!resp) {
+		elements.accountModalErrorText.innerHTML =
+		  TheI18n.GetString(I18nStringKey.kMissingCaptcha);
+		elements.accountModalError.style.display = 'block';
+		return false;
+	  }
+	  turnstileToken = resp;
+	}
+  
+	// reCAPTCHA
+	let recaptchaToken: string | undefined;
+	if (getAuth()!.info!.recaptcha?.required) {
+	  const idAttr = elements.accountLoginRecaptchaContainer.getAttribute('data-recaptcha-widget-id')!;
+	  recaptchaID = parseInt(idAttr, 10);
+	  const resp = (window as any).grecaptcha.getResponse(recaptchaID) || '';
+	  if (!resp) {
+		elements.accountModalErrorText.innerHTML =
+		  TheI18n.GetString(I18nStringKey.kMissingCaptcha);
+		elements.accountModalError.style.display = 'block';
+		return false;
+	  }
+	  recaptchaToken = resp;
+	}
+  
+	// Credentials
+	const username = elements.accountLoginUsername.value;
+	const password = elements.accountLoginPassword.value;
+  
+	// Attempt login
+	const result = await getAuth()!.login(
+	  username, password,
+	  hcaptchaToken, turnstileToken, recaptchaToken
+	);
+  
+	// Reset any captchas rendered
+	if (hcaptchaID)    (window as any).hcaptcha.reset(hcaptchaID);
+	if (turnstileID)   (window as any).turnstile.reset(turnstileID);
+	if (recaptchaID!=null) (window as any).grecaptcha.reset(recaptchaID);
+  
+	if (result.success) {
+	  // clear form fields
+	  elements.accountLoginUsername.value = '';
+	  elements.accountLoginPassword.value = '';
+	  elements.accountModalError.style.display = 'none';
+  
+	  if (result.verificationRequired) {
+		// move into the “verify email” step
+		accountBeingVerified = result.username!;
+		elements.accountVerifyEmailText.innerText =
+		  TheI18n.GetString(
+			I18nStringKey.kAccountModal_VerifyText,
+			result.email!
+		  );
+		elements.accountLoginSection.style.display = 'none';
+		elements.accountVerifyEmailSection.style.display = 'block';
+		return false;
+	  }
+  
+	  // fully logged in: store & load session, update UI, hide modal
+	  const host = new URL(getAuth()!.apiEndpoint).host;
+	  localStorage.setItem(`collabvm_session_${host}`, result.token!);
+	  await getAuth()!.loadSession(result.token!);
+	  loadAccount();
+	  accountModal.hide();
+  
+	} else {
+	  // display the server message
+	  elements.accountModalErrorText.innerHTML = result.error!;
+	  elements.accountModalError.style.display = 'block';
+	}
+  
+	return false;
+});  
 
 elements.accountRegisterForm.addEventListener('submit', async (e) => {
 	e.preventDefault();
-
+  
 	if (!getAuth()) {
 	  elements.accountModalErrorText.innerHTML =
 		TheI18n.GetString(I18nStringKey.kGeneric_No) ||
@@ -357,24 +381,23 @@ elements.accountRegisterForm.addEventListener('submit', async (e) => {
 	  elements.accountModalError.style.display = 'block';
 	  return false;
 	}
-
+  
+	// Ensure we have info
 	if (!getAuth()!.info) {
 	  await getAuth()!.getAPIInformation();
 	}
 	const info = getAuth()!.info!;
   
+	// Capture widget-IDs so we can reset later
+	let hcaptchaID: string | undefined;
+	let turnstileID: string | undefined;
+	let recaptchaID: number | undefined;
+  
 	// hCaptcha
 	let hcaptchaToken: string | undefined;
 	if (info.hcaptcha?.required) {
-	  const widgetId = elements.accountRegisterCaptchaContainer
-		.getAttribute('data-hcaptcha-widget-id');
-	  if (!widgetId) {
-		elements.accountModalErrorText.innerHTML =
-		  TheI18n.GetString(I18nStringKey.kMissingCaptcha);
-		elements.accountModalError.style.display = 'block';
-		return false;
-	  }
-	  const resp = (window as any).hcaptcha.getResponse(widgetId) || '';
+	  hcaptchaID = elements.accountRegisterCaptchaContainer.getAttribute('data-hcaptcha-widget-id')!;
+	  const resp = (window as any).hcaptcha.getResponse(hcaptchaID) || '';
 	  if (!resp) {
 		elements.accountModalErrorText.innerHTML =
 		  TheI18n.GetString(I18nStringKey.kMissingCaptcha);
@@ -387,15 +410,8 @@ elements.accountRegisterForm.addEventListener('submit', async (e) => {
 	// Turnstile
 	let turnstileToken: string | undefined;
 	if (info.turnstile?.required) {
-	  const widgetId = elements.accountRegisterTurnstileContainer
-		.getAttribute('data-turnstile-widget-id');
-	  if (!widgetId) {
-		elements.accountModalErrorText.innerHTML =
-		  TheI18n.GetString(I18nStringKey.kMissingCaptcha);
-		elements.accountModalError.style.display = 'block';
-		return false;
-	  }
-	  const resp = (window as any).turnstile.getResponse(widgetId) || '';
+	  turnstileID = elements.accountRegisterTurnstileContainer.getAttribute('data-turnstile-widget-id')!;
+	  const resp = (window as any).turnstile.getResponse(turnstileID) || '';
 	  if (!resp) {
 		elements.accountModalErrorText.innerHTML =
 		  TheI18n.GetString(I18nStringKey.kMissingCaptcha);
@@ -408,16 +424,9 @@ elements.accountRegisterForm.addEventListener('submit', async (e) => {
 	// reCAPTCHA
 	let recaptchaToken: string | undefined;
 	if (info.recaptcha?.required) {
-	  const idAttr = elements.accountRegisterRecaptchaContainer
-		.getAttribute('data-recaptcha-widget-id');
-	  const widgetNum = idAttr ? parseInt(idAttr, 10) : NaN;
-	  if (isNaN(widgetNum)) {
-		elements.accountModalErrorText.innerHTML =
-		  TheI18n.GetString(I18nStringKey.kMissingCaptcha);
-		elements.accountModalError.style.display = 'block';
-		return false;
-	  }
-	  const resp = (window as any).grecaptcha.getResponse(widgetNum) || '';
+	  const idAttr = elements.accountRegisterRecaptchaContainer.getAttribute('data-recaptcha-widget-id')!;
+	  recaptchaID = parseInt(idAttr, 10);
+	  const resp = (window as any).grecaptcha.getResponse(recaptchaID) || '';
 	  if (!resp) {
 		elements.accountModalErrorText.innerHTML =
 		  TheI18n.GetString(I18nStringKey.kMissingCaptcha);
@@ -427,7 +436,7 @@ elements.accountRegisterForm.addEventListener('submit', async (e) => {
 	  recaptchaToken = resp;
 	}
   
-	// Collect form inputs and validate that password and confirmation match
+	// Collect and validate inputs
 	const username = elements.accountRegisterUsername.value;
 	const password = elements.accountRegisterPassword.value;
 	const email    = elements.accountRegisterEmail.value;
@@ -439,37 +448,90 @@ elements.accountRegisterForm.addEventListener('submit', async (e) => {
 	  return false;
 	}
   
+	// Call register
 	const result = await getAuth()!.register(
 	  username, password, email, dob,
 	  hcaptchaToken, turnstileToken, recaptchaToken
 	);
   
-	// reset captchas, handle success/error…
+	// Reset captchas if they were rendered
+	if (info.hcaptcha?.required && hcaptchaID) (window as any).hcaptcha.reset(hcaptchaID);
+	if (info.turnstile?.required && turnstileID) (window as any).turnstile.reset(turnstileID);
+	if (info.recaptcha?.required && recaptchaID != null) (window as any).grecaptcha.reset(recaptchaID);
+  
+	if (!result) {
+	  // we already showed an error in AuthManager on invalid JSON, etc.
+	  return false;
+	}
+  
+	if (result.success) {
+	  // clear form fields
+	  elements.accountRegisterUsername.value = '';
+	  elements.accountRegisterEmail.value = '';
+	  elements.accountRegisterPassword.value = '';
+	  elements.accountRegisterConfirmPassword.value = '';
+	  elements.accountRegisterDateOfBirth.value = '';
+  
+	  if (result.verificationRequired) {
+		// move to email‐verification step
+		accountBeingVerified = result.username!;
+		elements.accountVerifyEmailText.innerText =
+		  TheI18n.GetString(I18nStringKey.kAccountModal_VerifyText, result.email!);
+		elements.accountRegisterSection.style.display = 'none';
+		elements.accountVerifyEmailSection.style.display = 'block';
+		return false;
+	  }
+  
+	  // fully registered → store token, load session, show UI
+	  const host = new URL(getAuth()!.apiEndpoint).host;
+	  localStorage.setItem(`collabvm_session_${host}`, result.sessionToken!);
+	  await getAuth()!.loadSession(result.sessionToken!);
+	  loadAccount();
+	  accountModal.hide();
+	} else {
+	  // show the server‐provided error
+	  elements.accountModalErrorText.innerHTML = result.error!;
+	  elements.accountModalError.style.display = 'block';
+	}
+  
 	return false;
-  });
+});  
   
 // Handle email verification form submission
 elements.accountVerifyEmailForm.addEventListener('submit', async e => {
-	e.preventDefault(); // prevent default form post
-	var username = accountBeingVerified!; // use the account pending verification
-	var code = elements.accountVerifyEmailCode.value; // get the verification code
-	var password = elements.accountVerifyEmailPassword.value; // get the chosen password
-	var result = await getAuth()!.verifyEmail(username, password, code); // call API to verify
-	if (result!.success) {
-		// clear input fields on success
-		elements.accountVerifyEmailCode.value = "";
-		elements.accountVerifyEmailPassword.value = "";
-		// store session token and load session
-		localStorage.setItem("collabvm_session_" + new URL(getAuth()!.apiEndpoint).host, result!.sessionToken!);
-		await getAuth()!.loadSession(result!.sessionToken!);
-		loadAccount(); // update UI for logged-in account
-		accountModal.hide(); // close the modal
-	} else {
-		// show error message
-		elements.accountModalErrorText.innerHTML = result!.error!;
-		elements.accountModalError.style.display = "block";
+	e.preventDefault();
+  
+	// Grab the username/code/password
+	const username = accountBeingVerified!;
+	const code     = elements.accountVerifyEmailCode.value;
+	const password = elements.accountVerifyEmailPassword.value;
+  
+	// Attempt verification
+	const result = await getAuth()!.verifyEmail(username, password, code);
+  
+	// Treat null or false success as an error
+	if (!result || !result.success) {
+	  elements.accountModalErrorText.innerHTML =
+		(result && result.error) || TheI18n.GetString(I18nStringKey.kGeneric_No) || "Verification failed.";
+	  elements.accountModalError.style.display = "block";
+	  return false;
 	}
-	return false; // prevent further handling
+  
+	// Success path: clear inputs & errors
+	elements.accountVerifyEmailCode.value           = "";
+	elements.accountVerifyEmailPassword.value       = "";
+	elements.accountModalError.style.display        = "none";
+  
+	// Store & load new session
+	const host = new URL(getAuth()!.apiEndpoint).host;
+	localStorage.setItem(`collabvm_session_${host}`, result.sessionToken!);
+	await getAuth()!.loadSession(result.sessionToken!);
+  
+	// Update UI and hide modal
+	loadAccount();
+	accountModal.hide();
+  
+	return false;
 });
 
 // Handle account settings update form submission
@@ -543,112 +605,132 @@ let resetPasswordEmail;
 
 // Handle reset password email request form submission
 elements.accountResetPasswordForm.addEventListener('submit', async e => {
-	e.preventDefault(); // prevent default form post
-
-	// prepare hCaptcha token if required
-	var hcaptchaToken = undefined;
-	var hcaptchaID = undefined;
+	e.preventDefault();
+  
+	// Prepare any captchas as before…
+	let hcaptchaToken: string | undefined, turnstileToken: string | undefined, recaptchaToken: string | undefined;
+	let hcaptchaID: string | undefined, turnstileID: string | undefined, recaptchaID: number | undefined;
+  
 	if (getAuth()!.info!.hcaptcha?.required) {
-		hcaptchaID = elements.accountResetPasswordCaptchaContainer.getAttribute("data-hcaptcha-widget-id")!;
-		var response = hcaptcha.getResponse(hcaptchaID);
-		if (response === "") {
-			elements.accountModalErrorText.innerHTML = TheI18n.GetString(I18nStringKey.kMissingCaptcha);
-			elements.accountModalError.style.display = "block";
-			return false;
-		}
-		hcaptchaToken = response;
+	  hcaptchaID = elements.accountResetPasswordCaptchaContainer.getAttribute("data-hcaptcha-widget-id")!;
+	  const resp = hcaptcha.getResponse(hcaptchaID);
+	  if (!resp) {
+		elements.accountModalErrorText.innerHTML = TheI18n.GetString(I18nStringKey.kMissingCaptcha);
+		elements.accountModalError.style.display   = "block";
+		return false;
+	  }
+	  hcaptchaToken = resp;
 	}
-
-	// prepare Turnstile if required
-	var turnstileToken = undefined;
-	var turnstileID = undefined;
+  
 	if (getAuth()!.info!.turnstile?.required) {
-		turnstileID = elements.accountResetPasswordTurnstileContainer.getAttribute("data-turnstile-widget-id")!;
-		var response: string = turnstile.getResponse(turnstileID) || "";
-		if (response === "") {
-			elements.accountModalErrorText.innerHTML = TheI18n.GetString(I18nStringKey.kMissingCaptcha);
-			elements.accountModalError.style.display = "block";
-			return false;
-		}
-		turnstileToken = response;
+	  turnstileID = elements.accountResetPasswordTurnstileContainer.getAttribute("data-turnstile-widget-id")!;
+	  const resp = turnstile.getResponse(turnstileID) || "";
+	  if (!resp) {
+		elements.accountModalErrorText.innerHTML = TheI18n.GetString(I18nStringKey.kMissingCaptcha);
+		elements.accountModalError.style.display   = "block";
+		return false;
+	  }
+	  turnstileToken = resp;
 	}
-
-	// prepare reCAPTCHA if required
-	var recaptchaToken = undefined;
-	var recaptchaID = undefined;
+  
 	if (getAuth()!.info!.recaptcha?.required) {
-		recaptchaID = parseInt(elements.accountResetPasswordRecaptchaContainer.getAttribute("data-recaptcha-widget-id")!);
-		var response = grecaptcha.getResponse(recaptchaID);
-		if (response === "") {
-			elements.accountModalErrorText.innerHTML = TheI18n.GetString(I18nStringKey.kMissingCaptcha);
-			elements.accountModalError.style.display = "block";
-			return false;
-		}
-		recaptchaToken = response;
+	  recaptchaID = parseInt(elements.accountResetPasswordRecaptchaContainer.getAttribute("data-recaptcha-widget-id")!, 10);
+	  const resp = grecaptcha.getResponse(recaptchaID) || "";
+	  if (!resp) {
+		elements.accountModalErrorText.innerHTML = TheI18n.GetString(I18nStringKey.kMissingCaptcha);
+		elements.accountModalError.style.display   = "block";
+		return false;
+	  }
+	  recaptchaToken = resp;
 	}
-
-	// gather reset request data
-	var username = elements.accountResetPasswordUsername.value;
-	var email = elements.accountResetPasswordEmail.value;
-	var result = await getAuth()!.sendPasswordResetEmail(username, email, hcaptchaToken, turnstileToken, recaptchaToken);
-
-	// reset captchas if used
-	if (getAuth()!.info!.hcaptcha?.required) hcaptcha.reset(hcaptchaID);
-	if (getAuth()!.info!.turnstile?.required) turnstile.reset(turnstileID);
-	if (getAuth()!.info!.recaptcha?.required) grecaptcha.reset(recaptchaID);
-
-	if (result!.success) {
-		// store for verification step
-		resetPasswordUsername = username;
-		resetPasswordEmail = email;
-		// clear inputs
-		elements.accountResetPasswordUsername.value = "";
-		elements.accountResetPasswordEmail.value = "";
-		// show verify-reset step
-		elements.accountVerifyPasswordResetText.innerText = TheI18n.GetString(
-			I18nStringKey.kAccountModal_VerifyPasswordResetText,
-			email
-		);
-		elements.accountResetPasswordSection.style.display = "none";
-		elements.accountResetPasswordVerifySection.style.display = "block";
-	} else {
-		// show error
-		elements.accountModalErrorText.innerHTML = result!.error!;
-		elements.accountModalError.style.display = "block";
+  
+	const username = elements.accountResetPasswordUsername.value;
+	const email    = elements.accountResetPasswordEmail.value;
+  
+	// Call the API
+	const result = await getAuth()!.sendPasswordResetEmail(
+	  username, email,
+	  hcaptchaToken, turnstileToken, recaptchaToken
+	);
+  
+	// Always reset any captchas we used
+	if (hcaptchaID) hcaptcha.reset(hcaptchaID);
+	if (turnstileID) turnstile.reset(turnstileID);
+	if (recaptchaID !== undefined) grecaptcha.reset(recaptchaID);
+  
+	// Handle null/failure
+	if (!result || !result.success) {
+	  elements.accountModalErrorText.innerHTML = result?.error || TheI18n.GetString(I18nStringKey.kGeneric_No);
+	  elements.accountModalError.style.display   = "block";
+	  return false;
 	}
+  
+	// Success: clear inputs & hide any old error
+	resetPasswordUsername = username;
+	resetPasswordEmail    = email;
+	elements.accountResetPasswordUsername.value = "";
+	elements.accountResetPasswordEmail.value    = "";
+	elements.accountModalError.style.display    = "none";
+  
+	// Advance to verification step
+	elements.accountVerifyPasswordResetText.innerText = TheI18n.GetString(
+	  I18nStringKey.kAccountModal_VerifyPasswordResetText,
+	  email
+	);
+	elements.accountResetPasswordSection.style.display       = "none";
+	elements.accountResetPasswordVerifySection.style.display = "block";
+  
 	return false;
-});
+});  
 
 // Handle password reset verification form submission
 elements.accountResetPasswordVerifyForm.addEventListener('submit', async e => {
-	e.preventDefault(); // prevent default form post
-	var code = elements.accountResetPasswordCode.value; // get code
-	var password = elements.accountResetPasswordNewPassword.value; // new password
-	// validate password confirmation
-	if (password !== elements.accountResetPasswordConfirmNewPassword.value) {
-		elements.accountModalErrorText.innerHTML = TheI18n.GetString(I18nStringKey.kPasswordsMustMatch);
-		elements.accountModalError.style.display = "block";
-		return false;
+	e.preventDefault();
+  
+	// Gather inputs
+	const code     = elements.accountResetPasswordCode.value;
+	const password = elements.accountResetPasswordNewPassword.value;
+	const confirm  = elements.accountResetPasswordConfirmNewPassword.value;
+  
+	// Password confirmation
+	if (password !== confirm) {
+	  elements.accountModalErrorText.innerHTML = TheI18n.GetString(I18nStringKey.kPasswordsMustMatch);
+	  elements.accountModalError.style.display   = "block";
+	  return false;
 	}
-	// attempt final password reset
-	var result = await getAuth()!.resetPassword(resetPasswordUsername!, resetPasswordEmail!, code, password);
-	if (result!.success) {
-		// clear fields on success
-		elements.accountResetPasswordCode.value = "";
-		elements.accountResetPasswordNewPassword.value = "";
-		elements.accountResetPasswordConfirmNewPassword.value = "";
-		// show success message and return to login
-		elements.accountModalSuccessText.innerHTML = TheI18n.GetString(I18nStringKey.kAccountModal_PasswordResetSuccess);
-		elements.accountModalSuccess.style.display = "block";
-		elements.accountResetPasswordVerifySection.style.display = "none";
-		elements.accountLoginSection.style.display = "block";
-	} else {
-		// show reset error
-		elements.accountModalErrorText.innerHTML = result!.error!;
-		elements.accountModalError.style.display = "block";
+  
+	// Attempt reset
+	const result = await getAuth()!.resetPassword(
+	  resetPasswordUsername!,
+	  resetPasswordEmail!,
+	  code,
+	  password
+	);
+  
+	// Null or failure → show error
+	if (!result || !result.success) {
+	  elements.accountModalErrorText.innerHTML = result?.error || TheI18n.GetString(I18nStringKey.kGeneric_No);
+	  elements.accountModalError.style.display   = "block";
+	  return false;
 	}
+  
+	// Success: clear inputs + errors
+	elements.accountResetPasswordCode.value                 = "";
+	elements.accountResetPasswordNewPassword.value          = "";
+	elements.accountResetPasswordConfirmNewPassword.value   = "";
+	elements.accountModalError.style.display                = "none";
+	elements.accountModalSuccess.style.display 				= "none";
+  
+	// Show success and flip back to login tab
+	elements.accountModalSuccessText.innerHTML = TheI18n.GetString(
+	  I18nStringKey.kAccountModal_PasswordResetSuccess
+	);
+	elements.accountModalSuccess.style.display               = "block";
+	elements.accountResetPasswordVerifySection.style.display = "none";
+	elements.accountLoginSection.style.display               = "block";
+  
 	return false;
-});
+});  
 
 export function onLogin(_rank: Rank, _perms: Permissions) {
     // Update globals

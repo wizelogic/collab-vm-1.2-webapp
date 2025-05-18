@@ -50,46 +50,35 @@ export default class AuthManager {
           throw new Error("This API requires a valid reCAPTCHA token.");
         }
       
-        try {
-          const res = await fetch(`${this.apiEndpoint}/api/v1/login`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              username,
-              password,
-              captchaToken,
-              turnstileToken,
-              recaptchaToken
-            })
-          });
+        const res = await fetch(`${this.apiEndpoint}/api/v1/login`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            username,
+            password,
+            captchaToken,
+            turnstileToken,
+            recaptchaToken
+          })
+        });
       
-          const ct = res.headers.get("Content-Type") || "";
-          if (!res.ok || !ct.includes("application/json")) {
-            console.warn(`Login expected JSON but got [${ct}] with status ${res.status}`);
-            throw new Error(`Login failed with status ${res.status}`);
-          }
+        const result = (await res.json()) as AccountLoginResult;
       
-          const data = await res.json() as AccountLoginResult;
-      
-          if (!data.success) {
-            // server rejected credentials or other error
-            elements.accountModalErrorText.innerText = data.error || "Login failed";
-            elements.accountModalError.style.display = "block";
-          } else if (!data.verificationRequired) {
-            // only set account if we have a full session
-            this.account = {
-              username:     data.username!,
-              email:        data.email!,
-              sessionToken: data.token!
-            };
-          }
-      
-          return data;
-        } catch (err) {
-          console.error("Login error:", err);
-          throw err;
+        if (!result.success) {
+          // server rejected credentials or other error
+          console.error(`API returned ${res.status}: ${result.error}`);
+          elements.accountModalErrorText.innerText = result.error || "Login failed";
+          elements.accountModalError.style.display = "block";
+        } else if (!result.verificationRequired) {
+          this.account = {
+            username:     result.username!,
+            email:        result.email!,
+            sessionToken: result.token!
+          };
         }
-      }             
+      
+        return result;
+      }                
 
       public async loadSession(token: string): Promise<SessionResult | null> {
         try {
@@ -158,19 +147,12 @@ export default class AuthManager {
           })
         });
       
-        const ct = res.headers.get("Content-Type") ?? "";
-        if (!ct.includes("application/json")) {
-          console.warn(
-            `Register expected JSON but got [${ct}] with status ${res.status}`
-          );
-          return null;
-        }
-      
         // parse the JSON even if res.ok is false
         const result = (await res.json()) as AccountRegisterResult;
       
-        // if the server returned an error status, display its message
+        // server rejected credentials or other error
         if (!res.ok) {
+          console.error(`API returned ${res.status}: ${result.error}`);
           elements.accountModalErrorText.innerText = result.error || "Registration failed";
           elements.accountModalError.style.display = "block";
           return result;
@@ -191,14 +173,6 @@ export default class AuthManager {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ token: this.account.sessionToken })
           });
-      
-          const ct = res.headers.get("Content-Type") ?? "";
-          if (!res.ok || !ct.includes("application/json")) {
-            console.warn(
-              `Logout expected JSON but got [${ct}] with status ${res.status}`
-            );
-            return null;
-          }
       
           const result = (await res.json()) as LogoutResult;
           this.account = null;
