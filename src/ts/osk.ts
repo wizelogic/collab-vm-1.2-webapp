@@ -1,6 +1,6 @@
-import { VM } from './main';
 import Keyboard from 'simple-keyboard';
 import { OSK_buttonToKeysym } from './keyboard';
+import { getActiveVM } from './state';
 
 let commonKeyboardOptions = {
   onKeyPress: (button: string) => onKeyPress(button),
@@ -130,7 +130,7 @@ const updateOSKStyle = () => {
 };
 
 function onKeyPress(button: string) {
-  if (VM === null) return;
+  if (getActiveVM() === null) return;
   let keysym = OSK_buttonToKeysym(button);
   if (!keysym) {
     console.error(`no keysym for ${button}, report this!`);
@@ -140,27 +140,27 @@ function onKeyPress(button: string) {
   switch (true) {
     case button.startsWith('{shift'):
       shiftHeld = !shiftHeld;
-      VM.key(keysym, shiftHeld);
+      getActiveVM()!.key(keysym, shiftHeld);
       break;
     case button.startsWith('{control'):
       ctrlHeld = !ctrlHeld;
-      VM.key(keysym, ctrlHeld);
+      getActiveVM()!.key(keysym, ctrlHeld);
       break;
     case button === '{capslock}':
       capsHeld = !capsHeld;
-      VM.key(keysym, capsHeld);
+      getActiveVM()!.key(keysym, capsHeld);
       break;
     case button.startsWith('{alt'):
       altHeld = !altHeld;
-      VM.key(keysym, altHeld);
+      getActiveVM()!.key(keysym, altHeld);
       break;
     case button.startsWith('{meta'):
       metaHeld = !metaHeld;
-      VM.key(keysym, metaHeld);
+      getActiveVM()!.key(keysym, metaHeld);
       break;
     default:
-      VM.key(keysym, true);
-      VM.key(keysym, false);
+      getActiveVM()!.key(keysym, true);
+      getActiveVM()!.key(keysym, false);
   }
 
   keyboard.setOptions({

@@ -205,7 +205,8 @@ export default class CollabVMClient {
 	private onBinaryMessage(data: ArrayBuffer) {
 		let msg: CollabVMProtocolMessage;
 		try {
-			msg = msgpack.decode(data);
+			// wrap ArrayBuffer in a Uint8Array so the decoder accepts it
+			msg = msgpack.decode(new Uint8Array(data));
 		} catch {
 			console.error("Server sent invalid binary message");
 			return;
@@ -213,19 +214,25 @@ export default class CollabVMClient {
 		if (msg.type === undefined) return;
 		switch (msg.type) {
 			case CollabVMProtocolMessageType.rect: {
-				if (!msg.rect || msg.rect.x === undefined || msg.rect.y === undefined || msg.rect.data === undefined) return;
-				let blob = new Blob( [ new Uint8Array(msg.rect.data) ], {type: "image/jpeg"});
-				let url = URL.createObjectURL(blob);
-				let img = new Image();
+				const r = msg.rect;
+				if (!r || r.x === undefined || r.y === undefined || r.data === undefined) return;
+	
+				// r.data is assumed to be something decode() gave you,
+				// if it's already a Uint8Array you can use it directly:
+				const blob = new Blob([ new Uint8Array(r.data) ], { type: "image/jpeg" });
+				const url  = URL.createObjectURL(blob);
+				const img  = new Image();
+	
 				img.addEventListener('load', () => {
-					this.loadRectangle(img, msg.rect!.x, msg.rect!.y);
+					this.loadRectangle(img, r.x, r.y);
 					URL.revokeObjectURL(url);
 				});
+	
 				img.src = url;
 				break;
 			}
 		}
-	}
+	}	
 
 	// Fires on WebSocket message
 	private onMessage(event: MessageEvent) {
