@@ -7,15 +7,27 @@ import { enableOSK } from './osk';
 import { sortUserList } from './userList.js';
 import { getActiveVM, users, w } from './state.js';
 
-export let turn = -1;
-export let turnInterval: number | undefined = undefined;
-export let voteInterval: number | undefined = undefined;
-export let turnTimer = 0;
-export let voteTimer = 0;
+let turn = -1;
+let turnInterval: number | undefined;
+let voteInterval: number | undefined;
+let turnTimer = 0;
+let voteTimer = 0;
 
-export function setTurn(newTurn : number) {
-    turn = newTurn;
-}
+export const getTurn = () => turn;
+export const setTurn = (t: number) => { turn = t; };
+
+export const getTurnInterval = () => turnInterval;
+export const setTurnInterval = (t: number | undefined) => { turnInterval = t; };
+
+export const getVoteInterval = () => voteInterval;
+export const setVoteInterval = (v: number | undefined) => { voteInterval = v; };
+
+export const getTurnTimer = () => turnTimer;
+export const setTurnTimer = (t: number) => { turnTimer = t; };
+
+export const getVoteTimer = () => voteTimer;
+export const setVoteTimer = (v: number) => { voteTimer = v; };
+
 
 export function voteEnd() {
     clearInterval(voteInterval);

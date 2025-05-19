@@ -8,7 +8,7 @@ import AuthManager from './AuthManager.js';
 import { elements } from './dom.js';
 import { renderAuth } from './auth'
 import { loadList } from './vmList.js';
-import { turn, turnTimer, voteTimer } from './turnAndVote.js';
+import { getTurn, getTurnTimer, getVoteTimer } from './turnAndVote.js';
 import { getDarkTheme, loadColorTheme } from './theme';
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -22,12 +22,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         if (getActiveVM()) {
             // Turn status
-            if (turn !== -1) {
+            if (getTurn() !== -1) {
                 elements.turnstatus.innerText = TheI18n.GetString(
-                    turn === 0
+                    getTurn() === 0
                         ? I18nStringKey.kVM_TurnTimeTimer
                         : I18nStringKey.kVM_WaitingTurnTimer,
-                    turnTimer
+                    getTurnTimer()
                 );
                 elements.turnBtnText.innerText = TheI18n.GetString(I18nStringKey.kVMButtons_EndTurn);
             } else {
@@ -37,7 +37,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (getActiveVM()!.getVoteStatus()) {
                 elements.voteTimeText.innerText = TheI18n.GetString(
                     I18nStringKey.kVM_VoteForResetTimer,
-                    voteTimer
+                    getVoteTimer()
                 );
             }
         }

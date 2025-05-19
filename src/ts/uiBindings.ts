@@ -3,7 +3,7 @@ import { sendChat } from "./chat";
 import { elements } from "./dom";
 import { I18nStringKey, TheI18n } from "./i18n";
 import { getActiveVM, getAuth, getPerms, getRank, w } from "./state";
-import { turn } from "./turnAndVote";
+import { getTurn } from "./turnAndVote";
 import { closeVM } from "./vmController";
 import { doLogin } from './auth';
 import { User } from './protocol/User';
@@ -31,7 +31,7 @@ elements.changeUsernameBtn.addEventListener('click', () => {
 });
 
 elements.takeTurnBtn.addEventListener('click', () =>
-    getActiveVM()?.turn(turn === -1)
+    getActiveVM()?.turn(getTurn() === -1)
 );
 
 elements.screenshotButton.addEventListener('click', () => {
